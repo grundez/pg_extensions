@@ -1,0 +1,5 @@
+# rtn.control
+comment = 'Roman to Arabic number conversion'
+default_version = '1.0'
+module_pathname = '$libdir/rtn'
+relocatable = true
