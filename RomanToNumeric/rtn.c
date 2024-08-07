@@ -4,6 +4,7 @@
 #include "utils/memutils.h"
 #include "postgres_fe.h"
 #include "lib/stringinfo.h"
+#include "utils/guc.h"
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -14,6 +15,45 @@ PG_FUNCTION_INFO_V1(ntr);
 
 Datum rtn(PG_FUNCTION_ARGS);
 Datum ntr(PG_FUNCTION_ARGS);
+
+static int min_value;
+static int max_value;
+
+void _PG_init(void);
+
+void
+_PG_init(void)
+{
+    DefineCustomIntVariable(
+        "rtn.min_value",
+        "Minimum value for conversion.",
+        "Sets the minimum value for Roman numeral conversion.",
+        &min_value,
+        1,
+        1,
+        10000,
+        PGC_USERSET,
+        0,
+        NULL,
+        NULL,
+        NULL
+    );
+
+    DefineCustomIntVariable(
+        "rtn.max_value",
+        "Maximum value for conversion.",
+        "Sets the maximum value for Roman numeral conversion.",
+        &max_value,
+        3999,
+        1,
+        10000,
+        PGC_USERSET,
+        0,
+        NULL,
+        NULL,
+        NULL
+    );
+}
 
 Datum
 rtn(PG_FUNCTION_ARGS)
@@ -42,6 +82,12 @@ rtn(PG_FUNCTION_ARGS)
         }
     }
 
+    if (result < min_value || result > max_value) {
+        ereport(ERROR,
+                (errmsg("Input value %d is out of the allowed range [%d, %d]",
+                        result, min_value, max_value)));
+    }
+
     PG_RETURN_INT32(result);
 }
 
@@ -50,17 +96,18 @@ ntr(PG_FUNCTION_ARGS)
 {
     int number = PG_GETARG_INT32(0);
 
-    // Arrays of Roman numerals and their values
+    if (number < min_value || number > max_value) {
+        ereport(ERROR,
+                (errmsg("Input value %d is out of the allowed range [%d, %d]",
+                        number, min_value, max_value)));
+    }
+
+    // Объявление всех переменных в начале функции
     const char *roman_numerals[] = {"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"};
     int values[] = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};
-    
-    // StringInfoData is a structure used for building strings in PostgreSQL
     StringInfoData buf;
-    initStringInfo(&buf);
 
-    if (number <= 0 || number >= 4000) { // Limits for numbers
-        PG_RETURN_NULL();
-    }
+    initStringInfo(&buf);
 
     for (int i = 0; i < 13; i++) {
         while (number >= values[i]) {
