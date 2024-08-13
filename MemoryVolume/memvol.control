@@ -1,0 +1,6 @@
+# /pg_extensions/MemortVolume/memvol.control
+comment = 'Memory units'
+default_version = '1.0'
+module_pathname = '$libdir/memvol'
+relocatable = true
+encoding = UTF8
