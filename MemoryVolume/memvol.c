@@ -8,6 +8,7 @@ PG_MODULE_MAGIC;
 
 // Функция для создания таблицы и вставки значений
 PG_FUNCTION_INFO_V1(init_vlm_ref);
+Datum init_vlm_ref(PG_FUNCTION_ARGS);
 
 Datum
 init_vlm_ref(PG_FUNCTION_ARGS)
@@ -15,10 +16,10 @@ init_vlm_ref(PG_FUNCTION_ARGS)
     int ret;
     const char *create_table_query = "CREATE TABLE IF NOT EXISTS vlm_ref (name text, k numeric);";
     const char *insert_data_query = 
-        "INSERT INTO vlm_ref VALUES "
-        "('Бит',1), ('Байт',8), ('Килобайт', 8192),"
-        "('Мегабайт',8388608), ('Гигабайт',8589934592),"
-        "('Терабайт',8.796093e12), ('Петабайт',9.0071993e15);";
+    "INSERT INTO vlm_ref VALUES "
+    "('Бит', 1), ('Байт', 2^3), ('Килобайт', 2^13),"
+    "('Мегабайт', 2^23), ('Гигабайт', 2^33),"
+    "('Терабайт', 2^43), ('Петабайт', 2^53);";
 
     SPI_connect();
 
@@ -39,6 +40,7 @@ init_vlm_ref(PG_FUNCTION_ARGS)
 
 // Функция конвертации значений
 PG_FUNCTION_INFO_V1(vlm2vlm);
+Datum vlm2vlm(PG_FUNCTION_ARGS);
 
 Datum
 vlm2vlm(PG_FUNCTION_ARGS)
@@ -98,4 +100,40 @@ vlm2vlm(PG_FUNCTION_ARGS)
     SPI_finish();
 
     PG_RETURN_NUMERIC(result);
+}
+
+// Функция отображения таблицы значений
+// ИНОГДА КЛАДЕТ СЕРВЕР - ДОДЕЛАТЬ
+PG_FUNCTION_INFO_V1(display_vlm_ref);
+Datum display_vlm_ref(PG_FUNCTION_ARGS);
+
+Datum
+display_vlm_ref(PG_FUNCTION_ARGS)
+{
+    int ret;
+    int proc;
+    SPI_connect();
+
+    // Выполняем запрос для получения всех данных из таблицы vlm_ref
+    ret = SPI_exec("SELECT name, k FROM vlm_ref", 0);
+    proc = SPI_processed;
+
+    if (ret < 0)
+        elog(ERROR, "Failed to select data from vlm_ref");
+
+    // Перебираем все строки результата и выводим их
+    for (int i = 0; i < proc; i++)
+    {
+        HeapTuple tuple = SPI_tuptable->vals[i];
+        TupleDesc tupdesc = SPI_tuptable->tupdesc;
+        bool isnull;
+        Datum name_datum = SPI_getbinval(tuple, tupdesc, 1, &isnull);
+        Datum k_datum = SPI_getbinval(tuple, tupdesc, 2, &isnull);
+        char *name = TextDatumGetCString(name_datum);
+        char *k_str = DatumGetCString(DirectFunctionCall1(numeric_out, k_datum));
+        elog(INFO, "%s: %s", name, k_str);
+    }
+
+    SPI_finish();
+    PG_RETURN_VOID();
 }
